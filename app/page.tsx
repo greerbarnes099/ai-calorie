@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 type NutritionResult = {
   name: string;
@@ -36,40 +37,80 @@ export default function Home() {
   const [error, setError] = useState("");
   const [dailyMeals, setDailyMeals] = useState<DailyMeal[]>([]);
   const [dailyStatsError, setDailyStatsError] = useState("");
+  const [dailyStatsLoading, setDailyStatsLoading] = useState(true);
+  const [dailyCalories, setDailyCalories] = useState(0);
+  const [dailyProtein, setDailyProtein] = useState(0);
+  const [dailyFat, setDailyFat] = useState(0);
+  const [dailyCarbs, setDailyCarbs] = useState(0);
 
   const fetchDailyStats = async () => {
     try {
+      setDailyStatsLoading(true);
       setDailyStatsError("");
-      const response = await fetch("/api/daily-stats", { method: "GET" });
-      const data = (await response.json()) as { meals?: DailyMeal[]; error?: string };
+      const now = new Date();
+      const startOfDay = new Date(now);
+      startOfDay.setHours(0, 0, 0, 0);
 
-      if (!response.ok) {
-        setDailyStatsError(data.error ?? "Не вдалося завантажити статистику.");
+      const endOfDay = new Date(startOfDay);
+      endOfDay.setDate(endOfDay.getDate() + 1);
+
+      const { data, error } = await supabase
+        .from("meals")
+        .select("id, created_at, meal_description, calories, protein, fat, carbs")
+        .gte("created_at", startOfDay.toISOString())
+        .lt("created_at", endOfDay.toISOString())
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Supabase daily stats client fetch error:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        setDailyStatsError("Не вдалося завантажити статистику.");
+        setDailyMeals([]);
+        setDailyCalories(0);
+        setDailyProtein(0);
+        setDailyFat(0);
+        setDailyCarbs(0);
         return;
       }
 
-      setDailyMeals(Array.isArray(data.meals) ? data.meals : []);
-    } catch {
+      const meals = (data ?? []) as DailyMeal[];
+      setDailyMeals(meals);
+
+      const totals = meals.reduce(
+        (acc, item) => {
+          acc.calories += Number(item.calories ?? 0);
+          acc.protein += Number(item.protein ?? 0);
+          acc.fat += Number(item.fat ?? 0);
+          acc.carbs += Number(item.carbs ?? 0);
+          return acc;
+        },
+        { calories: 0, protein: 0, fat: 0, carbs: 0 },
+      );
+
+      setDailyCalories(totals.calories);
+      setDailyProtein(totals.protein);
+      setDailyFat(totals.fat);
+      setDailyCarbs(totals.carbs);
+    } catch (fetchError) {
+      console.error("Client daily stats unexpected error:", fetchError);
       setDailyStatsError("Не вдалося завантажити статистику.");
+      setDailyMeals([]);
+      setDailyCalories(0);
+      setDailyProtein(0);
+      setDailyFat(0);
+      setDailyCarbs(0);
+    } finally {
+      setDailyStatsLoading(false);
     }
   };
 
   useEffect(() => {
     fetchDailyStats();
   }, []);
-
-  const dailyTotals = useMemo(() => {
-    return dailyMeals.reduce(
-      (acc, item) => {
-        acc.calories += Number(item.calories ?? 0);
-        acc.protein += Number(item.protein ?? 0);
-        acc.fat += Number(item.fat ?? 0);
-        acc.carbs += Number(item.carbs ?? 0);
-        return acc;
-      },
-      { calories: 0, protein: 0, fat: 0, carbs: 0 },
-    );
-  }, [dailyMeals]);
 
   const handleAnalyze = async () => {
     if (!mealInput.trim()) return;
@@ -188,22 +229,27 @@ export default function Home() {
             </span>
           </div>
 
-          {dailyStatsError ? (
-            <p className="mb-4 text-sm font-medium text-rose-600">{dailyStatsError}</p>
+          {dailyStatsLoading ? (
+            <div className="flex items-center justify-center gap-3 py-8 text-slate-600">
+              <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
+              <span className="text-sm font-medium">Завантаження прогресу...</span>
+            </div>
           ) : null}
 
-          <div className="space-y-4">
+          {dailyStatsError ? <p className="mb-4 text-sm font-medium text-rose-600">{dailyStatsError}</p> : null}
+
+          <div className={`space-y-4 ${dailyStatsLoading ? "opacity-40" : ""}`}>
             <div>
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-700">Калорії</span>
                 <span className="text-slate-600">
-                  {dailyTotals.calories} / {DAILY_GOALS.calories} ккал
+                  {dailyCalories} / {DAILY_GOALS.calories} ккал
                 </span>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                  style={{ width: `${getProgress(dailyTotals.calories, DAILY_GOALS.calories)}%` }}
+                  style={{ width: `${getProgress(dailyCalories, DAILY_GOALS.calories)}%` }}
                 />
               </div>
             </div>
@@ -212,13 +258,13 @@ export default function Home() {
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-700">Білки</span>
                 <span className="text-slate-600">
-                  {dailyTotals.protein} / {DAILY_GOALS.protein} г
+                  {dailyProtein} / {DAILY_GOALS.protein} г
                 </span>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-sky-500 transition-all duration-500"
-                  style={{ width: `${getProgress(dailyTotals.protein, DAILY_GOALS.protein)}%` }}
+                  style={{ width: `${getProgress(dailyProtein, DAILY_GOALS.protein)}%` }}
                 />
               </div>
             </div>
@@ -227,13 +273,13 @@ export default function Home() {
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-700">Жири</span>
                 <span className="text-slate-600">
-                  {dailyTotals.fat} / {DAILY_GOALS.fat} г
+                  {dailyFat} / {DAILY_GOALS.fat} г
                 </span>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-amber-500 transition-all duration-500"
-                  style={{ width: `${getProgress(dailyTotals.fat, DAILY_GOALS.fat)}%` }}
+                  style={{ width: `${getProgress(dailyFat, DAILY_GOALS.fat)}%` }}
                 />
               </div>
             </div>
@@ -242,13 +288,13 @@ export default function Home() {
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-medium text-slate-700">Вуглеводи</span>
                 <span className="text-slate-600">
-                  {dailyTotals.carbs} / {DAILY_GOALS.carbs} г
+                  {dailyCarbs} / {DAILY_GOALS.carbs} г
                 </span>
               </div>
               <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
                 <div
                   className="h-full rounded-full bg-violet-500 transition-all duration-500"
-                  style={{ width: `${getProgress(dailyTotals.carbs, DAILY_GOALS.carbs)}%` }}
+                  style={{ width: `${getProgress(dailyCarbs, DAILY_GOALS.carbs)}%` }}
                 />
               </div>
             </div>
