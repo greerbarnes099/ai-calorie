@@ -22,6 +22,12 @@ type DailyMeal = {
   user_name: string;
 };
 
+type UserProfile = {
+  id: number;
+  name: string;
+  calorie_goal: number;
+};
+
 const DAILY_GOALS = {
   calories: 2000,
   protein: 120,
@@ -49,7 +55,11 @@ export default function Home() {
   const [dailyCarbs, setDailyCarbs] = useState(0);
   const [userName, setUserName] = useState("");
   const [profileNameInput, setProfileNameInput] = useState("");
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [profiles, setProfiles] = useState<UserProfile[]>([]);
+  const [isProfilesLoading, setIsProfilesLoading] = useState(true);
+  const [profilesError, setProfilesError] = useState("");
+  const [isCreatingProfile, setIsCreatingProfile] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [dailyWaterMl, setDailyWaterMl] = useState(0);
   const [isAddingWater, setIsAddingWater] = useState(false);
 
@@ -129,25 +139,55 @@ export default function Home() {
     }
   }, [resetDailyStats]);
 
+  const fetchProfiles = useCallback(async () => {
+    try {
+      setIsProfilesLoading(true);
+      setProfilesError("");
+      const { data, error } = await supabase
+        .from("user_profiles")
+        .select("id, name, calorie_goal")
+        .order("name", { ascending: true });
+
+      if (error) {
+        console.error("Supabase profiles fetch error:", {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        setProfilesError("Не вдалося завантажити профілі.");
+        setProfiles([]);
+        return;
+      }
+
+      setProfiles((data ?? []) as UserProfile[]);
+    } catch (fetchError) {
+      console.error("Unexpected profiles fetch error:", fetchError);
+      setProfilesError("Не вдалося завантажити профілі.");
+      setProfiles([]);
+    } finally {
+      setIsProfilesLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     const savedName = localStorage.getItem(USER_NAME_STORAGE_KEY)?.trim() ?? "";
+    fetchProfiles();
+
     if (savedName) {
       setUserName(savedName);
       setProfileNameInput(savedName);
-      setIsEditingProfile(false);
       fetchDailyStats(savedName);
       return;
     }
 
-    setIsEditingProfile(true);
     setDailyStatsLoading(false);
-  }, [fetchDailyStats]);
+  }, [fetchDailyStats, fetchProfiles]);
 
   const handleAnalyze = async () => {
     if (!mealInput.trim()) return;
     if (!userName.trim()) {
       setError("Спочатку обери профіль.");
-      setIsEditingProfile(true);
       return;
     }
 
@@ -185,24 +225,69 @@ export default function Home() {
     }
   };
 
-  const handleSaveProfile = () => {
+  const handleSaveProfile = async () => {
     const trimmedName = profileNameInput.trim();
     if (!trimmedName) {
       setError("Введи ім'я профілю.");
       return;
     }
 
+    try {
+      setIsSavingProfile(true);
+      setProfilesError("");
+      const { error: insertError } = await supabase.from("user_profiles").insert({
+        name: trimmedName,
+        calorie_goal: 2000,
+      });
+
+      if (insertError) {
+        console.error("Supabase profile insert error:", {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code,
+        });
+        setProfilesError("Не вдалося створити профіль.");
+        return;
+      }
+    } catch (saveError) {
+      console.error("Unexpected profile insert error:", saveError);
+      setProfilesError("Не вдалося створити профіль.");
+      return;
+    } finally {
+      setIsSavingProfile(false);
+    }
+
     localStorage.setItem(USER_NAME_STORAGE_KEY, trimmedName);
     setUserName(trimmedName);
-    setIsEditingProfile(false);
+    setIsCreatingProfile(false);
     setError("");
-    fetchDailyStats(trimmedName);
+    await fetchProfiles();
+    await fetchDailyStats(trimmedName);
+  };
+
+  const handleSelectProfile = async (selectedName: string) => {
+    localStorage.setItem(USER_NAME_STORAGE_KEY, selectedName);
+    setUserName(selectedName);
+    setProfileNameInput(selectedName);
+    setIsCreatingProfile(false);
+    setError("");
+    await fetchDailyStats(selectedName);
+  };
+
+  const handleLogoutProfile = async () => {
+    localStorage.removeItem(USER_NAME_STORAGE_KEY);
+    setUserName("");
+    setMealInput("");
+    setResults([]);
+    resetDailyStats();
+    setIsCreatingProfile(false);
+    await fetchProfiles();
   };
 
   const handleAddWater = async () => {
     if (!userName.trim()) {
       setError("Спочатку обери профіль.");
-      setIsEditingProfile(true);
       return;
     }
 
@@ -238,6 +323,93 @@ export default function Home() {
     }
   };
 
+  if (!userName.trim()) {
+    return (
+      <main className="min-h-screen bg-[#f8faf8] px-4 py-10 text-slate-900">
+        <div className="mx-auto flex min-h-[85vh] w-full max-w-3xl items-center justify-center">
+          <section className="w-full rounded-2xl border border-white/80 bg-white/80 p-8 text-center shadow-[8px_8px_24px_rgba(15,23,42,0.06),-8px_-8px_24px_rgba(255,255,255,0.92)] backdrop-blur-xl transition-all duration-500">
+            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">
+              AI Calories
+            </p>
+            <h1 className="mb-2 text-4xl font-bold text-slate-900 sm:text-5xl">Обери профіль</h1>
+            <p className="mb-8 text-slate-600">Оберіть існуючий профіль або створіть новий.</p>
+
+            <div className="mb-6">
+              {!isCreatingProfile ? (
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingProfile(true)}
+                  className="w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-6 py-4 text-lg font-semibold text-white shadow-[0_10px_20px_rgba(16,185,129,0.2)] transition-all duration-300 hover:scale-[1.02]"
+                >
+                  Створити новий профіль
+                </button>
+              ) : (
+                <div className="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 text-left">
+                  <input
+                    type="text"
+                    value={profileNameInput}
+                    onChange={(event) => setProfileNameInput(event.target.value)}
+                    placeholder="Введи ім'я (наприклад, Микита)"
+                    className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white px-4 text-base outline-none ring-emerald-100 transition-all duration-300 focus:border-emerald-300 focus:ring-4"
+                  />
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleSaveProfile}
+                      disabled={isSavingProfile}
+                      className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-4 py-3 font-semibold text-white transition-all duration-300 hover:scale-[1.01] disabled:opacity-60"
+                    >
+                      {isSavingProfile ? "Збереження..." : "Зберегти"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsCreatingProfile(false)}
+                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-all duration-300 hover:bg-slate-50"
+                    >
+                      Скасувати
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+                Існуючі профілі
+              </p>
+              {isProfilesLoading ? (
+                <div className="flex items-center justify-center gap-3 py-6 text-slate-600">
+                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
+                  <span className="text-sm font-medium">Завантаження профілів...</span>
+                </div>
+              ) : null}
+              {profilesError ? (
+                <p className="text-sm font-medium text-rose-600">{profilesError}</p>
+              ) : null}
+              {!isProfilesLoading && profiles.length === 0 ? (
+                <p className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4 text-slate-500">
+                  Профілів поки немає. Створи перший профіль.
+                </p>
+              ) : null}
+              <div className="grid gap-3 sm:grid-cols-2">
+                {profiles.map((profile) => (
+                  <button
+                    key={profile.id}
+                    type="button"
+                    onClick={() => handleSelectProfile(profile.name)}
+                    className="rounded-2xl border border-white/80 bg-white/90 px-4 py-5 text-lg font-bold text-slate-800 shadow-[6px_6px_18px_rgba(15,23,42,0.05),-6px_-6px_18px_rgba(255,255,255,0.9)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-50"
+                  >
+                    {profile.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#f8faf8] px-4 py-10 text-slate-900">
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
@@ -247,15 +419,13 @@ export default function Home() {
               AI Calories
             </p>
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-base font-semibold text-slate-700">
-                {userName ? `Привіт, ${userName}! Твій прогрес:` : "Обери профіль для початку"}
-              </p>
+              <p className="text-base font-semibold text-slate-700">Профіль: {userName}</p>
               <button
                 type="button"
-                onClick={() => setIsEditingProfile(true)}
+                onClick={handleLogoutProfile}
                 className="rounded-xl border border-slate-200/80 bg-white/80 px-3 py-1.5 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
               >
-                Змінити профіль
+                Вийти
               </button>
             </div>
             <h1 className="text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">
@@ -287,31 +457,6 @@ export default function Home() {
 
           {error ? <p className="mt-4 text-sm font-medium text-rose-600">{error}</p> : null}
         </section>
-
-        {isEditingProfile ? (
-          <section className="rounded-2xl border border-white/80 bg-white/90 p-6 shadow-[8px_8px_24px_rgba(15,23,42,0.06),-8px_-8px_24px_rgba(255,255,255,0.9)] transition-all duration-300 sm:p-8">
-            <h2 className="mb-2 text-2xl font-bold text-slate-900">Профіль сім&apos;ї</h2>
-            <p className="mb-4 text-sm text-slate-600">
-              Введи ім&apos;я користувача (наприклад, Микита, Олена). Воно збережеться локально.
-            </p>
-            <div className="flex flex-col gap-3 sm:flex-row">
-              <input
-                type="text"
-                value={profileNameInput}
-                onChange={(event) => setProfileNameInput(event.target.value)}
-                placeholder="Введи ім'я"
-                className="h-11 flex-1 rounded-2xl border border-slate-200/80 bg-white px-4 text-base outline-none ring-emerald-100 transition-all duration-300 focus:border-emerald-300 focus:ring-4"
-              />
-              <button
-                type="button"
-                onClick={handleSaveProfile}
-                className="h-11 rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-5 font-semibold text-white shadow-[0_10px_20px_rgba(16,185,129,0.22)] transition-all duration-300 hover:scale-[1.03] hover:from-emerald-500 hover:to-emerald-600"
-              >
-                Зберегти профіль
-              </button>
-            </div>
-          </section>
-        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {results.length === 0 ? (
