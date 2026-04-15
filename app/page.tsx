@@ -23,9 +23,9 @@ type DailyMeal = {
 };
 
 type UserProfile = {
-  id: number;
-  name: string;
-  calorie_goal: number;
+  user_name: string;
+  daily_calories: number;
+  daily_water: number;
 };
 
 const DAILY_GOALS = {
@@ -145,10 +145,11 @@ export default function Home() {
       setProfilesError("");
       const { data, error } = await supabase
         .from("user_profiles")
-        .select("id, name, calorie_goal")
-        .order("name", { ascending: true });
+        .select("user_name, daily_calories, daily_water")
+        .order("user_name", { ascending: true });
 
       if (error) {
+        console.error(error);
         console.error("Supabase profiles fetch error:", {
           message: error.message,
           details: error.details,
@@ -236,11 +237,13 @@ export default function Home() {
       setIsSavingProfile(true);
       setProfilesError("");
       const { error: insertError } = await supabase.from("user_profiles").insert({
-        name: trimmedName,
-        calorie_goal: 2000,
+        user_name: trimmedName,
+        daily_calories: 2000,
+        daily_water: 2000,
       });
 
       if (insertError) {
+        console.error(insertError);
         console.error("Supabase profile insert error:", {
           message: insertError.message,
           details: insertError.details,
@@ -394,12 +397,12 @@ export default function Home() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {profiles.map((profile) => (
                   <button
-                    key={profile.id}
+                    key={profile.user_name}
                     type="button"
-                    onClick={() => handleSelectProfile(profile.name)}
+                    onClick={() => handleSelectProfile(profile.user_name)}
                     className="rounded-2xl border border-white/80 bg-white/90 px-4 py-5 text-lg font-bold text-slate-800 shadow-[6px_6px_18px_rgba(15,23,42,0.05),-6px_-6px_18px_rgba(255,255,255,0.9)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-50"
                   >
-                    {profile.name}
+                    {profile.user_name}
                   </button>
                 ))}
               </div>
