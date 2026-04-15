@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
 
 type NutritionResult = {
@@ -19,6 +19,7 @@ type DailyMeal = {
   protein: number;
   fat: number;
   carbs: number;
+  user_name: string;
 };
 
 const DAILY_GOALS = {
@@ -29,6 +30,7 @@ const DAILY_GOALS = {
 };
 
 const getProgress = (value: number, goal: number) => Math.min((value / goal) * 100, 100);
+const USER_NAME_STORAGE_KEY = "ai-calories-user-name";
 
 export default function Home() {
   const [mealInput, setMealInput] = useState("");
@@ -42,8 +44,26 @@ export default function Home() {
   const [dailyProtein, setDailyProtein] = useState(0);
   const [dailyFat, setDailyFat] = useState(0);
   const [dailyCarbs, setDailyCarbs] = useState(0);
+  const [userName, setUserName] = useState("");
+  const [profileNameInput, setProfileNameInput] = useState("");
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
 
-  const fetchDailyStats = async () => {
+  const resetDailyStats = useCallback(() => {
+    setDailyMeals([]);
+    setDailyCalories(0);
+    setDailyProtein(0);
+    setDailyFat(0);
+    setDailyCarbs(0);
+  }, []);
+
+  const fetchDailyStats = useCallback(async (selectedUserName: string) => {
+    if (!selectedUserName) {
+      setDailyStatsLoading(false);
+      setDailyStatsError("");
+      resetDailyStats();
+      return;
+    }
+
     try {
       setDailyStatsLoading(true);
       setDailyStatsError("");
@@ -56,9 +76,10 @@ export default function Home() {
 
       const { data, error } = await supabase
         .from("meals")
-        .select("id, created_at, meal_description, calories, protein, fat, carbs")
+        .select("id, created_at, meal_description, calories, protein, fat, carbs, user_name")
         .gte("created_at", startOfDay.toISOString())
         .lt("created_at", endOfDay.toISOString())
+        .eq("user_name", selectedUserName)
         .order("created_at", { ascending: false });
 
       if (error) {
@@ -69,11 +90,7 @@ export default function Home() {
           code: error.code,
         });
         setDailyStatsError("Не вдалося завантажити статистику.");
-        setDailyMeals([]);
-        setDailyCalories(0);
-        setDailyProtein(0);
-        setDailyFat(0);
-        setDailyCarbs(0);
+        resetDailyStats();
         return;
       }
 
@@ -98,22 +115,34 @@ export default function Home() {
     } catch (fetchError) {
       console.error("Client daily stats unexpected error:", fetchError);
       setDailyStatsError("Не вдалося завантажити статистику.");
-      setDailyMeals([]);
-      setDailyCalories(0);
-      setDailyProtein(0);
-      setDailyFat(0);
-      setDailyCarbs(0);
+      resetDailyStats();
     } finally {
       setDailyStatsLoading(false);
     }
-  };
+  }, [resetDailyStats]);
 
   useEffect(() => {
-    fetchDailyStats();
-  }, []);
+    const savedName = localStorage.getItem(USER_NAME_STORAGE_KEY)?.trim() ?? "";
+    if (savedName) {
+      setUserName(savedName);
+      setProfileNameInput(savedName);
+      setIsEditingProfile(false);
+      fetchDailyStats(savedName);
+      return;
+    }
+
+    setIsEditingProfile(true);
+    setDailyStatsLoading(false);
+  }, [fetchDailyStats]);
 
   const handleAnalyze = async () => {
     if (!mealInput.trim()) return;
+    if (!userName.trim()) {
+      setError("Спочатку обери профіль.");
+      setIsEditingProfile(true);
+      return;
+    }
+
     setError("");
     setIsLoading(true);
 
@@ -123,7 +152,7 @@ export default function Home() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ meal: mealInput }),
+        body: JSON.stringify({ meal: mealInput, userName }),
       });
 
       const data = (await response.json()) as {
@@ -139,13 +168,27 @@ export default function Home() {
 
       const apiResults = Array.isArray(data.items) ? data.items : [];
       setResults(apiResults);
-      await fetchDailyStats();
+      await fetchDailyStats(userName);
     } catch {
       setResults([]);
       setError("Не вдалося зв'язатися з сервером. Перевір підключення.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSaveProfile = () => {
+    const trimmedName = profileNameInput.trim();
+    if (!trimmedName) {
+      setError("Введи ім'я профілю.");
+      return;
+    }
+
+    localStorage.setItem(USER_NAME_STORAGE_KEY, trimmedName);
+    setUserName(trimmedName);
+    setIsEditingProfile(false);
+    setError("");
+    fetchDailyStats(trimmedName);
   };
 
   return (
@@ -156,6 +199,18 @@ export default function Home() {
             <p className="text-sm font-semibold uppercase tracking-wide text-emerald-600">
               AI Calories
             </p>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-base font-semibold text-slate-800">
+                {userName ? `Привіт, ${userName}! Твій прогрес:` : "Обери профіль для початку"}
+              </p>
+              <button
+                type="button"
+                onClick={() => setIsEditingProfile(true)}
+                className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+              >
+                Змінити профіль
+              </button>
+            </div>
             <h1 className="text-3xl font-bold leading-tight sm:text-4xl">
               Підрахунок калорій та БЖВ
             </h1>
@@ -176,7 +231,7 @@ export default function Home() {
             <button
               type="button"
               onClick={handleAnalyze}
-              disabled={isLoading}
+              disabled={isLoading || !userName.trim()}
               className="h-12 rounded-xl bg-emerald-600 px-6 font-semibold text-white transition hover:bg-emerald-700 active:scale-[0.99] disabled:cursor-not-allowed disabled:bg-emerald-400"
             >
               {isLoading ? "Аналіз..." : "Аналізувати"}
@@ -185,6 +240,31 @@ export default function Home() {
 
           {error ? <p className="mt-4 text-sm font-medium text-rose-600">{error}</p> : null}
         </section>
+
+        {isEditingProfile ? (
+          <section className="rounded-3xl border border-white/70 bg-white/90 p-6 shadow-lg shadow-emerald-100 sm:p-8">
+            <h2 className="mb-2 text-xl font-bold text-slate-900">Профіль сім&apos;ї</h2>
+            <p className="mb-4 text-sm text-slate-600">
+              Введи ім&apos;я користувача (наприклад, Микита, Олена). Воно збережеться локально.
+            </p>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <input
+                type="text"
+                value={profileNameInput}
+                onChange={(event) => setProfileNameInput(event.target.value)}
+                placeholder="Введи ім'я"
+                className="h-11 flex-1 rounded-xl border border-slate-200 bg-white px-4 text-base outline-none ring-emerald-200 transition focus:border-emerald-400 focus:ring-4"
+              />
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                className="h-11 rounded-xl bg-emerald-600 px-5 font-semibold text-white transition hover:bg-emerald-700"
+              >
+                Зберегти профіль
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {results.length === 0 ? (

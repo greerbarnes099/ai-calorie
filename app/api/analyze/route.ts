@@ -29,10 +29,18 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const meal = typeof body?.meal === "string" ? body.meal.trim() : "";
+    const userName = typeof body?.userName === "string" ? body.userName.trim() : "";
 
     if (!meal) {
       return NextResponse.json(
         { error: "Опиши, будь ласка, що ти з'їв." },
+        { status: 400 },
+      );
+    }
+
+    if (!userName) {
+      return NextResponse.json(
+        { error: "Ім'я профілю не вказане. Обери профіль і спробуй ще раз." },
         { status: 400 },
       );
     }
@@ -79,6 +87,7 @@ export async function POST(request: Request) {
         protein: item.protein,
         fat: item.fats,
         carbs: item.carbs,
+        user_name: userName,
       }));
 
       const { error: supabaseError } = await supabase.from("meals").insert(rowsToInsert);
