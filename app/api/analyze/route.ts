@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { supabase } from "@/lib/supabase";
 
 type NutritionItem = {
   name: string;
@@ -71,8 +72,30 @@ export async function POST(request: Request) {
       }))
       .filter((item) => item.name.trim().length > 0);
 
+    if (sanitizedItems.length > 0) {
+      const rowsToInsert = sanitizedItems.map((item) => ({
+        meal_description: item.name,
+        calories: item.calories,
+        protein: item.protein,
+        fat: item.fats,
+        carbs: item.carbs,
+      }));
+
+      const { error: supabaseError } = await supabase.from("meals").insert(rowsToInsert);
+
+      if (supabaseError) {
+        console.error("Supabase insert error:", {
+          message: supabaseError.message,
+          details: supabaseError.details,
+          hint: supabaseError.hint,
+          code: supabaseError.code,
+        });
+      }
+    }
+
     return NextResponse.json({ items: sanitizedItems });
-  } catch {
+  } catch (error) {
+    console.error("Analyze API error:", error);
     return NextResponse.json(
       { error: "Не вдалося виконати аналіз. Спробуй ще раз." },
       { status: 500 },
