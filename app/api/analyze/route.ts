@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import { NextResponse } from "next/server";
+import { getKyivDayRangeUtc } from "@/lib/kyiv-time";
 import { supabase } from "@/lib/supabase";
 
 type NutritionItem = {
@@ -20,6 +21,8 @@ const openai = new OpenAI({
 
 export async function POST(request: Request) {
   try {
+    const kyivDayRange = getKyivDayRangeUtc();
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: "OPENAI_API_KEY не знайдено у змінних середовища." },
@@ -98,6 +101,7 @@ export async function POST(request: Request) {
           details: supabaseError.details,
           hint: supabaseError.hint,
           code: supabaseError.code,
+          kyivDayRange,
         });
       }
     }

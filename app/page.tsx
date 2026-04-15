@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { getKyivDayRangeUtc } from "@/lib/kyiv-time";
 import { supabase } from "@/lib/supabase";
 
 type NutritionResult = {
@@ -34,9 +35,8 @@ const DAILY_GOALS = {
   fat: 70,
   carbs: 250,
 };
+const DEFAULT_DAILY_WATER_GOAL = 2000;
 const WATER_GLASS_ML = 250;
-const WATER_GOAL_ML = 2000;
-const WATER_GLASSES_GOAL = WATER_GOAL_ML / WATER_GLASS_ML;
 
 const getProgress = (value: number, goal: number) => Math.min((value / goal) * 100, 100);
 const USER_NAME_STORAGE_KEY = "ai-calories-user-name";
@@ -53,6 +53,8 @@ export default function Home() {
   const [dailyProtein, setDailyProtein] = useState(0);
   const [dailyFat, setDailyFat] = useState(0);
   const [dailyCarbs, setDailyCarbs] = useState(0);
+  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(DAILY_GOALS.calories);
+  const [dailyWaterGoal, setDailyWaterGoal] = useState(DEFAULT_DAILY_WATER_GOAL);
   const [userName, setUserName] = useState("");
   const [profileNameInput, setProfileNameInput] = useState("");
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -60,6 +62,10 @@ export default function Home() {
   const [profilesError, setProfilesError] = useState("");
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsCaloriesInput, setSettingsCaloriesInput] = useState(String(DAILY_GOALS.calories));
+  const [settingsWaterInput, setSettingsWaterInput] = useState(String(DEFAULT_DAILY_WATER_GOAL));
+  const [isUpdatingProfileSettings, setIsUpdatingProfileSettings] = useState(false);
   const [dailyWaterMl, setDailyWaterMl] = useState(0);
   const [isAddingWater, setIsAddingWater] = useState(false);
 
@@ -83,18 +89,13 @@ export default function Home() {
     try {
       setDailyStatsLoading(true);
       setDailyStatsError("");
-      const now = new Date();
-      const startOfDay = new Date(now);
-      startOfDay.setHours(0, 0, 0, 0);
-
-      const endOfDay = new Date(startOfDay);
-      endOfDay.setDate(endOfDay.getDate() + 1);
+      const { start, end } = getKyivDayRangeUtc();
 
       const { data, error } = await supabase
         .from("meals")
         .select("id, created_at, meal_description, calories, protein, fat, carbs, user_name")
-        .gte("created_at", startOfDay.toISOString())
-        .lt("created_at", endOfDay.toISOString())
+        .gte("created_at", start)
+        .lt("created_at", end)
         .eq("user_name", selectedUserName)
         .order("created_at", { ascending: false });
 
@@ -139,7 +140,7 @@ export default function Home() {
     }
   }, [resetDailyStats]);
 
-  const fetchProfiles = useCallback(async () => {
+  const fetchProfiles = useCallback(async (activeUserName?: string) => {
     try {
       setIsProfilesLoading(true);
       setProfilesError("");
@@ -161,7 +162,19 @@ export default function Home() {
         return;
       }
 
-      setProfiles((data ?? []) as UserProfile[]);
+      const loadedProfiles = (data ?? []) as UserProfile[];
+      setProfiles(loadedProfiles);
+
+      const activeProfileName = activeUserName ?? userName;
+      const activeProfile = loadedProfiles.find((profile) => profile.user_name === activeProfileName);
+      if (activeProfile) {
+        const nextCalories = Number(activeProfile.daily_calories || DAILY_GOALS.calories);
+        const nextWater = Number(activeProfile.daily_water || DEFAULT_DAILY_WATER_GOAL);
+        setDailyCalorieGoal(nextCalories);
+        setDailyWaterGoal(nextWater);
+        setSettingsCaloriesInput(String(nextCalories));
+        setSettingsWaterInput(String(nextWater));
+      }
     } catch (fetchError) {
       console.error("Unexpected profiles fetch error:", fetchError);
       setProfilesError("Не вдалося завантажити профілі.");
@@ -169,11 +182,11 @@ export default function Home() {
     } finally {
       setIsProfilesLoading(false);
     }
-  }, []);
+  }, [userName]);
 
   useEffect(() => {
     const savedName = localStorage.getItem(USER_NAME_STORAGE_KEY)?.trim() ?? "";
-    fetchProfiles();
+    fetchProfiles(savedName || undefined);
 
     if (savedName) {
       setUserName(savedName);
@@ -265,11 +278,19 @@ export default function Home() {
     setUserName(trimmedName);
     setIsCreatingProfile(false);
     setError("");
-    await fetchProfiles();
+    await fetchProfiles(trimmedName);
     await fetchDailyStats(trimmedName);
   };
 
   const handleSelectProfile = async (selectedName: string) => {
+    const selectedProfile = profiles.find((profile) => profile.user_name === selectedName);
+    if (selectedProfile) {
+      setDailyCalorieGoal(Number(selectedProfile.daily_calories || DAILY_GOALS.calories));
+      setDailyWaterGoal(Number(selectedProfile.daily_water || DEFAULT_DAILY_WATER_GOAL));
+      setSettingsCaloriesInput(String(selectedProfile.daily_calories || DAILY_GOALS.calories));
+      setSettingsWaterInput(String(selectedProfile.daily_water || DEFAULT_DAILY_WATER_GOAL));
+    }
+
     localStorage.setItem(USER_NAME_STORAGE_KEY, selectedName);
     setUserName(selectedName);
     setProfileNameInput(selectedName);
@@ -284,9 +305,77 @@ export default function Home() {
     setMealInput("");
     setResults([]);
     resetDailyStats();
+    setDailyCalorieGoal(DAILY_GOALS.calories);
+    setDailyWaterGoal(DEFAULT_DAILY_WATER_GOAL);
+    setSettingsCaloriesInput(String(DAILY_GOALS.calories));
+    setSettingsWaterInput(String(DEFAULT_DAILY_WATER_GOAL));
+    setIsSettingsOpen(false);
     setIsCreatingProfile(false);
     await fetchProfiles();
   };
+
+  const handleSaveProfileSettings = async () => {
+    if (!userName.trim()) return;
+
+    const parsedCalories = Number(settingsCaloriesInput);
+    const parsedWater = Number(settingsWaterInput);
+
+    if (!Number.isFinite(parsedCalories) || parsedCalories <= 0) {
+      setError("Вкажи коректну денну норму калорій.");
+      return;
+    }
+
+    if (!Number.isFinite(parsedWater) || parsedWater <= 0) {
+      setError("Вкажи коректну денну норму води в мл.");
+      return;
+    }
+
+    try {
+      setIsUpdatingProfileSettings(true);
+      setError("");
+      const { error: updateError } = await supabase
+        .from("user_profiles")
+        .update({
+          daily_calories: parsedCalories,
+          daily_water: parsedWater,
+        })
+        .eq("user_name", userName);
+
+      if (updateError) {
+        console.error(updateError);
+        console.error("Supabase profile update error:", {
+          message: updateError.message,
+          details: updateError.details,
+          hint: updateError.hint,
+          code: updateError.code,
+        });
+        setError("Не вдалося оновити налаштування профілю.");
+        return;
+      }
+
+      setDailyCalorieGoal(parsedCalories);
+      setDailyWaterGoal(parsedWater);
+      setProfiles((prevProfiles) =>
+        prevProfiles.map((profile) =>
+          profile.user_name === userName
+            ? {
+                ...profile,
+                daily_calories: parsedCalories,
+                daily_water: parsedWater,
+              }
+            : profile,
+        ),
+      );
+      setIsSettingsOpen(false);
+    } catch (updateError) {
+      console.error(updateError);
+      setError("Не вдалося оновити налаштування профілю.");
+    } finally {
+      setIsUpdatingProfileSettings(false);
+    }
+  };
+
+  const waterGlassesGoal = Math.max(8, Math.min(10, Math.ceil(dailyWaterGoal / WATER_GLASS_ML)));
 
   const handleAddWater = async () => {
     if (!userName.trim()) {
@@ -423,13 +512,23 @@ export default function Home() {
             </p>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <p className="text-base font-semibold text-slate-700">Профіль: {userName}</p>
-              <button
-                type="button"
-                onClick={handleLogoutProfile}
-                className="rounded-xl border border-slate-200/80 bg-white/80 px-3 py-1.5 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
-              >
-                Вийти
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsSettingsOpen((current) => !current)}
+                  className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200/80 bg-white/80 text-lg text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
+                  aria-label="Налаштування профілю"
+                >
+                  ⚙️
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogoutProfile}
+                  className="rounded-xl border border-slate-200/80 bg-white/80 px-3 py-1.5 text-sm font-medium text-slate-700 transition-all duration-300 hover:-translate-y-0.5 hover:bg-white hover:shadow-sm"
+                >
+                  Вийти
+                </button>
+              </div>
             </div>
             <h1 className="text-4xl font-bold leading-tight text-slate-900 sm:text-5xl">
               Підрахунок калорій та БЖВ
@@ -460,6 +559,51 @@ export default function Home() {
 
           {error ? <p className="mt-4 text-sm font-medium text-rose-600">{error}</p> : null}
         </section>
+
+        {isSettingsOpen ? (
+          <section className="rounded-2xl border border-white/80 bg-white/80 p-6 shadow-[8px_8px_24px_rgba(15,23,42,0.06),-8px_-8px_24px_rgba(255,255,255,0.92)] backdrop-blur-xl transition-all duration-300 sm:p-8">
+            <h2 className="mb-4 text-2xl font-bold text-slate-900">Налаштування профілю</h2>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-slate-700">Денна норма калорій</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={settingsCaloriesInput}
+                  onChange={(event) => setSettingsCaloriesInput(event.target.value)}
+                  className="h-11 rounded-2xl border border-slate-200/80 bg-white px-4 text-base outline-none ring-emerald-100 transition-all duration-300 focus:border-emerald-300 focus:ring-4"
+                />
+              </label>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-semibold text-slate-700">Денна норма води (мл)</span>
+                <input
+                  type="number"
+                  min={1}
+                  value={settingsWaterInput}
+                  onChange={(event) => setSettingsWaterInput(event.target.value)}
+                  className="h-11 rounded-2xl border border-slate-200/80 bg-white px-4 text-base outline-none ring-emerald-100 transition-all duration-300 focus:border-emerald-300 focus:ring-4"
+                />
+              </label>
+            </div>
+            <div className="mt-5 flex gap-2">
+              <button
+                type="button"
+                onClick={handleSaveProfileSettings}
+                disabled={isUpdatingProfileSettings}
+                className="rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-5 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-[1.02] disabled:opacity-60"
+              >
+                {isUpdatingProfileSettings ? "Збереження..." : "Зберегти"}
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsSettingsOpen(false)}
+                className="rounded-2xl border border-slate-200 bg-white px-5 py-2.5 font-semibold text-slate-700 transition-all duration-300 hover:bg-slate-50"
+              >
+                Скасувати
+              </button>
+            </div>
+          </section>
+        ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {results.length === 0 ? (
@@ -518,13 +662,13 @@ export default function Home() {
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-700">Калорії</span>
                 <span className="text-base font-bold text-slate-800">
-                  {dailyCalories} / {DAILY_GOALS.calories} ккал
+                  {dailyCalories} / {dailyCalorieGoal} ккал
                 </span>
               </div>
               <div className="h-5 w-full overflow-hidden rounded-full bg-emerald-100/70">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-200 to-emerald-500 transition-all duration-700"
-                  style={{ width: `${getProgress(dailyCalories, DAILY_GOALS.calories)}%` }}
+                  style={{ width: `${getProgress(dailyCalories, dailyCalorieGoal)}%` }}
                 />
               </div>
             </div>
@@ -580,7 +724,7 @@ export default function Home() {
           <div className="mb-4 flex items-center justify-between gap-4">
             <h2 className="text-3xl font-bold text-slate-900">Водний баланс</h2>
             <p className="text-base font-bold text-slate-700">
-              Випито: {(dailyWaterMl / 1000).toFixed(1)} л / {(WATER_GOAL_ML / 1000).toFixed(1)} л
+              Випито: {(dailyWaterMl / 1000).toFixed(1)} л / {(dailyWaterGoal / 1000).toFixed(1)} л
             </p>
           </div>
 
@@ -589,7 +733,7 @@ export default function Home() {
           </p>
 
           <div className="flex flex-wrap gap-3">
-            {Array.from({ length: WATER_GLASSES_GOAL }).map((_, index) => {
+            {Array.from({ length: waterGlassesGoal }).map((_, index) => {
               const filledGlasses = Math.floor(dailyWaterMl / WATER_GLASS_ML);
               const isFilled = index < filledGlasses;
 

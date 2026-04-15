@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getKyivDayRangeUtc } from "@/lib/kyiv-time";
 import { supabase } from "@/lib/supabase";
 
 type MealRow = {
@@ -12,18 +13,13 @@ type MealRow = {
 };
 
 async function fetchDailyStats() {
-  const now = new Date();
-  const startOfDay = new Date(now);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(startOfDay);
-  endOfDay.setDate(endOfDay.getDate() + 1);
+  const { start, end } = getKyivDayRangeUtc();
 
   const { data, error } = await supabase
     .from("meals")
     .select("id, created_at, meal_description, calories, protein, fat, carbs")
-    .gte("created_at", startOfDay.toISOString())
-    .lt("created_at", endOfDay.toISOString())
+    .gte("created_at", start)
+    .lt("created_at", end)
     .order("created_at", { ascending: false });
 
   if (error) {
