@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type NutritionResult = {
   name: string;
@@ -10,11 +10,66 @@ type NutritionResult = {
   carbs: number;
 };
 
+type DailyMeal = {
+  id: number;
+  created_at: string;
+  meal_description: string;
+  calories: number;
+  protein: number;
+  fat: number;
+  carbs: number;
+};
+
+const DAILY_GOALS = {
+  calories: 2000,
+  protein: 120,
+  fat: 70,
+  carbs: 250,
+};
+
+const getProgress = (value: number, goal: number) => Math.min((value / goal) * 100, 100);
+
 export default function Home() {
   const [mealInput, setMealInput] = useState("");
   const [results, setResults] = useState<NutritionResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [dailyMeals, setDailyMeals] = useState<DailyMeal[]>([]);
+  const [dailyStatsError, setDailyStatsError] = useState("");
+
+  const fetchDailyStats = async () => {
+    try {
+      setDailyStatsError("");
+      const response = await fetch("/api/daily-stats", { method: "GET" });
+      const data = (await response.json()) as { meals?: DailyMeal[]; error?: string };
+
+      if (!response.ok) {
+        setDailyStatsError(data.error ?? "Не вдалося завантажити статистику.");
+        return;
+      }
+
+      setDailyMeals(Array.isArray(data.meals) ? data.meals : []);
+    } catch {
+      setDailyStatsError("Не вдалося завантажити статистику.");
+    }
+  };
+
+  useEffect(() => {
+    fetchDailyStats();
+  }, []);
+
+  const dailyTotals = useMemo(() => {
+    return dailyMeals.reduce(
+      (acc, item) => {
+        acc.calories += Number(item.calories ?? 0);
+        acc.protein += Number(item.protein ?? 0);
+        acc.fat += Number(item.fat ?? 0);
+        acc.carbs += Number(item.carbs ?? 0);
+        return acc;
+      },
+      { calories: 0, protein: 0, fat: 0, carbs: 0 },
+    );
+  }, [dailyMeals]);
 
   const handleAnalyze = async () => {
     if (!mealInput.trim()) return;
@@ -43,6 +98,7 @@ export default function Home() {
 
       const apiResults = Array.isArray(data.items) ? data.items : [];
       setResults(apiResults);
+      await fetchDailyStats();
     } catch {
       setResults([]);
       setError("Не вдалося зв'язатися з сервером. Перевір підключення.");
@@ -122,6 +178,81 @@ export default function Home() {
               </article>
             ))
           )}
+        </section>
+
+        <section className="rounded-3xl border border-white/70 bg-white/85 p-6 shadow-lg shadow-sky-100 sm:p-8">
+          <div className="mb-6 flex items-center justify-between gap-4">
+            <h2 className="text-2xl font-bold text-slate-900">Мій прогрес за сьогодні</h2>
+            <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+              {dailyMeals.length} запис(ів)
+            </span>
+          </div>
+
+          {dailyStatsError ? (
+            <p className="mb-4 text-sm font-medium text-rose-600">{dailyStatsError}</p>
+          ) : null}
+
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="font-medium text-slate-700">Калорії</span>
+                <span className="text-slate-600">
+                  {dailyTotals.calories} / {DAILY_GOALS.calories} ккал
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-emerald-500 transition-all duration-500"
+                  style={{ width: `${getProgress(dailyTotals.calories, DAILY_GOALS.calories)}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="font-medium text-slate-700">Білки</span>
+                <span className="text-slate-600">
+                  {dailyTotals.protein} / {DAILY_GOALS.protein} г
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-sky-500 transition-all duration-500"
+                  style={{ width: `${getProgress(dailyTotals.protein, DAILY_GOALS.protein)}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="font-medium text-slate-700">Жири</span>
+                <span className="text-slate-600">
+                  {dailyTotals.fat} / {DAILY_GOALS.fat} г
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-amber-500 transition-all duration-500"
+                  style={{ width: `${getProgress(dailyTotals.fat, DAILY_GOALS.fat)}%` }}
+                />
+              </div>
+            </div>
+
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="font-medium text-slate-700">Вуглеводи</span>
+                <span className="text-slate-600">
+                  {dailyTotals.carbs} / {DAILY_GOALS.carbs} г
+                </span>
+              </div>
+              <div className="h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-violet-500 transition-all duration-500"
+                  style={{ width: `${getProgress(dailyTotals.carbs, DAILY_GOALS.carbs)}%` }}
+                />
+              </div>
+            </div>
+          </div>
         </section>
       </div>
     </main>
