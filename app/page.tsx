@@ -28,6 +28,9 @@ const DAILY_GOALS = {
   fat: 70,
   carbs: 250,
 };
+const WATER_GLASS_ML = 250;
+const WATER_GOAL_ML = 2000;
+const WATER_GLASSES_GOAL = WATER_GOAL_ML / WATER_GLASS_ML;
 
 const getProgress = (value: number, goal: number) => Math.min((value / goal) * 100, 100);
 const USER_NAME_STORAGE_KEY = "ai-calories-user-name";
@@ -47,6 +50,8 @@ export default function Home() {
   const [userName, setUserName] = useState("");
   const [profileNameInput, setProfileNameInput] = useState("");
   const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [dailyWaterMl, setDailyWaterMl] = useState(0);
+  const [isAddingWater, setIsAddingWater] = useState(false);
 
   const resetDailyStats = useCallback(() => {
     setDailyMeals([]);
@@ -54,6 +59,7 @@ export default function Home() {
     setDailyProtein(0);
     setDailyFat(0);
     setDailyCarbs(0);
+    setDailyWaterMl(0);
   }, []);
 
   const fetchDailyStats = useCallback(async (selectedUserName: string) => {
@@ -96,6 +102,8 @@ export default function Home() {
 
       const meals = (data ?? []) as DailyMeal[];
       setDailyMeals(meals);
+      const waterEntries = meals.filter((item) => item.meal_description === "Water");
+      setDailyWaterMl(waterEntries.length * WATER_GLASS_ML);
 
       const totals = meals.reduce(
         (acc, item) => {
@@ -189,6 +197,45 @@ export default function Home() {
     setIsEditingProfile(false);
     setError("");
     fetchDailyStats(trimmedName);
+  };
+
+  const handleAddWater = async () => {
+    if (!userName.trim()) {
+      setError("Спочатку обери профіль.");
+      setIsEditingProfile(true);
+      return;
+    }
+
+    try {
+      setIsAddingWater(true);
+      setDailyStatsError("");
+      const { error: insertError } = await supabase.from("meals").insert({
+        meal_description: "Water",
+        calories: 0,
+        protein: 0,
+        fat: 0,
+        carbs: 0,
+        user_name: userName,
+      });
+
+      if (insertError) {
+        console.error("Supabase water insert error:", {
+          message: insertError.message,
+          details: insertError.details,
+          hint: insertError.hint,
+          code: insertError.code,
+        });
+        setDailyStatsError("Не вдалося додати воду. Спробуй ще раз.");
+        return;
+      }
+
+      await fetchDailyStats(userName);
+    } catch (waterError) {
+      console.error("Unexpected water insert error:", waterError);
+      setDailyStatsError("Не вдалося додати воду. Спробуй ще раз.");
+    } finally {
+      setIsAddingWater(false);
+    }
   };
 
   return (
@@ -378,6 +425,43 @@ export default function Home() {
                 />
               </div>
             </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-white/80 bg-white/70 p-6 shadow-[8px_8px_24px_rgba(15,23,42,0.06),-8px_-8px_24px_rgba(255,255,255,0.92)] backdrop-blur-xl transition-all duration-300 sm:p-8">
+          <div className="mb-4 flex items-center justify-between gap-4">
+            <h2 className="text-3xl font-bold text-slate-900">Водний баланс</h2>
+            <p className="text-base font-bold text-slate-700">
+              Випито: {(dailyWaterMl / 1000).toFixed(1)} л / {(WATER_GOAL_ML / 1000).toFixed(1)} л
+            </p>
+          </div>
+
+          <p className="mb-5 text-sm text-slate-600">
+            Натисни на склянку, щоб додати 250 мл води.
+          </p>
+
+          <div className="flex flex-wrap gap-3">
+            {Array.from({ length: WATER_GLASSES_GOAL }).map((_, index) => {
+              const filledGlasses = Math.floor(dailyWaterMl / WATER_GLASS_ML);
+              const isFilled = index < filledGlasses;
+
+              return (
+                <button
+                  key={`water-glass-${index}`}
+                  type="button"
+                  onClick={handleAddWater}
+                  disabled={isAddingWater || dailyStatsLoading || !userName.trim()}
+                  className={`flex h-14 w-12 items-center justify-center rounded-2xl border text-xl shadow-sm transition-all duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isFilled
+                      ? "border-sky-300 bg-gradient-to-b from-sky-100 to-sky-300 text-sky-700"
+                      : "border-sky-100 bg-sky-50/70 text-sky-400 hover:bg-sky-100"
+                  }`}
+                  aria-label={`Додати воду, склянка ${index + 1}`}
+                >
+                  {isAddingWater ? "..." : "🥛"}
+                </button>
+              );
+            })}
           </div>
         </section>
       </div>
