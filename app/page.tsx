@@ -1,12 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useRef } from "react";
 import { computeMacroGoalsFromDailyCalories } from "@/lib/macro-goals";
 import { getKyivDayRangeUtc } from "@/lib/kyiv-time";
 import { supabase } from "@/lib/supabase";
 import AvocadoLogo from "@/components/AvocadoLogo";
 import FlowerIcon from "@/components/FlowerIcon";
 import AnimatedCharacters from "@/components/AnimatedCharacters";
+import PhotoAnalysisLoader from "@/components/PhotoAnalysisLoader";
+import { compressImage, validateImageFile, formatFileSize } from "@/lib/image-utils";
 
 type NutritionResult = {
   name: string;
@@ -82,6 +84,10 @@ export default function Home() {
   const [isUpdatingProfileSettings, setIsUpdatingProfileSettings] = useState(false);
   const [dailyWaterMl, setDailyWaterMl] = useState(0);
   const [isAddingWater, setIsAddingWater] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>("");
+  const [isAnalyzingPhoto, setIsAnalyzingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const resetDailyStats = useCallback(() => {
     setDailyMeals([]);
@@ -469,6 +475,105 @@ export default function Home() {
       setDailyStatsError("Не вдалося додати воду. Спробуй ще раз.");
     } finally {
       setIsAddingWater(false);
+    }
+  };
+
+  const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validate file
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setError(validation.error || "Invalid file");
+      return;
+    }
+
+    setSelectedImage(file);
+    
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      setImagePreview(e.target?.result as string);
+    };
+    reader.readAsDataURL(file);
+
+    // Clear any previous errors
+    setError("");
+  };
+
+  const handlePhotoAnalysis = async () => {
+    if (!selectedImage || !userName.trim()) {
+      setError("Please select an image and ensure you have a profile selected.");
+      return;
+    }
+
+    try {
+      setIsAnalyzingPhoto(true);
+      setError("");
+
+      // Compress image
+      const compressedImage = await compressImage(selectedImage);
+      console.log(`Image compressed: ${formatFileSize(selectedImage.size)} -> ${formatFileSize(compressedImage.size)}`);
+
+      // Send to API for analysis
+      const response = await fetch("/api/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ 
+          image: compressedImage.base64,
+          userName 
+        }),
+      });
+
+      const data = (await response.json()) as {
+        items?: NutritionResult[];
+        error?: string;
+      };
+
+      if (!response.ok) {
+        setResults([]);
+        setError(data.error || "Photo analysis failed.");
+        return;
+      }
+
+      const apiResults = Array.isArray(data.items) ? data.items : [];
+      setResults(apiResults);
+      
+      // Auto-save to database
+      for (const item of apiResults) {
+        const { error: insertError } = await supabase.from("meals").insert({
+          meal_description: `Photo: ${item.name}`,
+          calories: item.calories,
+          protein: item.protein,
+          fat: item.fats,
+          carbs: item.carbs,
+          user_name: userName,
+        });
+
+        if (insertError) {
+          console.error("Failed to save photo analysis:", insertError);
+        }
+      }
+
+      // Refresh daily stats
+      await fetchDailyStats(userName);
+      
+      // Clear image selection
+      setSelectedImage(null);
+      setImagePreview("");
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+    } catch (error) {
+      console.error("Photo analysis error:", error);
+      setError("Failed to analyze photo. Please try again.");
+      setResults([]);
+    } finally {
+      setIsAnalyzingPhoto(false);
     }
   };
 

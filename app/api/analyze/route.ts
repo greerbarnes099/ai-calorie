@@ -32,37 +32,65 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const meal = typeof body?.meal === "string" ? body.meal.trim() : "";
+    const image = typeof body?.image === "string" ? body.image : "";
     const userName = typeof body?.userName === "string" ? body.userName.trim() : "";
 
-    if (!meal) {
+    if (!meal && !image) {
       return NextResponse.json(
-        { error: "Опиши, будь ласка, що ти з'їв." },
+        { error: "Describe what you ate or upload an image." },
         { status: 400 },
       );
     }
 
     if (!userName) {
       return NextResponse.json(
-        { error: "Ім'я профілю не вказане. Обери профіль і спробуй ще раз." },
+        { error: "Profile name not specified. Select a profile and try again." },
         { status: 400 },
       );
     }
 
+    let userContent: string | Array<any>;
+    let systemPrompt: string;
+
+    if (image) {
+      // Image analysis
+      userContent = [
+        {
+          type: "text",
+          text: "Analyze this food image. Estimate portion size, ingredients and provide nutritional information in JSON format.",
+        },
+        {
+          type: "image_url",
+          image_url: {
+            url: image,
+          },
+        },
+      ];
+
+      systemPrompt =
+        "You are a nutritionist analyzing food images. Estimate portion size, identify ingredients, and provide nutritional information. Return only valid JSON without markdown. Response format: {\"items\":[{\"name\":\"string\",\"calories\":number,\"protein\":number,\"fats\":number,\"carbs\":number}]}. Values should be realistic, round to whole numbers. Consider the visual portion size and ingredients visible in the image.";
+    } else {
+      // Text analysis
+      userContent = `Analyze: ${meal}`;
+      systemPrompt =
+        "You are a nutritionist. Analyze the entered food and return only valid JSON without markdown. Response format: {\"items\":[{\"name\":\"string\",\"calories\":number,\"protein\":number,\"fats\":number,\"carbs\":number}]}. Values should be realistic, round to whole numbers.";
+    }
+
     const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
+      model: "gpt-4o", // Use vision-capable model for image analysis
       response_format: { type: "json_object" },
       messages: [
         {
           role: "system",
-          content:
-            "Ти нутриціолог. Аналізуй введену їжу і повертай лише валідний JSON без markdown. Формат відповіді: {\"items\":[{\"name\":\"string\",\"calories\":number,\"protein\":number,\"fats\":number,\"carbs\":number}]}. Значення мають бути реалістичними, округлюй до цілих.",
+          content: systemPrompt,
         },
         {
           role: "user",
-          content: `Проаналізуй: ${meal}`,
+          content: image ? userContent : userContent,
         },
       ],
       temperature: 0.2,
+      max_tokens: 1000,
     });
 
     const raw = completion.choices[0]?.message?.content;
