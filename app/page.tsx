@@ -785,23 +785,94 @@ export default function Home() {
             </p>
           </div>
 
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <input
-              type="text"
-              value={mealInput}
-              onChange={(event) => setMealInput(event.target.value)}
-              placeholder="Наприклад: омлет із 2 яєць, тост і кава"
-              className="h-12 flex-1 rounded-2xl border border-slate-200/80 bg-white px-4 text-base outline-none ring-emerald-100 transition-all duration-300 focus:border-emerald-300 focus:ring-4"
-            />
-            <button
-              type="button"
-              onClick={handleAnalyze}
-              disabled={isLoading || !userName.trim()}
-              className="h-12 rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-6 font-semibold text-white shadow-[0_10px_20px_rgba(16,185,129,0.25)] transition-all duration-300 hover:scale-[1.03] hover:from-emerald-500 hover:to-emerald-600 active:scale-[0.99] disabled:cursor-not-allowed disabled:from-emerald-200 disabled:to-emerald-300"
-            >
-              {isLoading ? "Аналіз..." : "Аналізувати"}
-            </button>
-          </div>
+          <div className="flex flex-col gap-3">
+  {/* Photo preview section */}
+  {imagePreview && (
+    <div className="rounded-2xl border border-white/60 bg-white/70 p-4 shadow-sm">
+      <div className="flex items-center gap-4">
+        <img 
+          src={imagePreview} 
+          alt="Food preview" 
+          className="w-20 h-20 object-cover rounded-xl"
+        />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-700 font-['Inter,sans-serif']">
+            {selectedImage?.name}
+          </p>
+          <p className="text-xs text-slate-500 font-['Inter,sans-serif']">
+            {selectedImage && formatFileSize(selectedImage.size)}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setSelectedImage(null);
+            setImagePreview("");
+            if (fileInputRef.current) {
+              fileInputRef.current.value = "";
+            }
+          }}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 transition-all duration-300 hover:bg-slate-50"
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  )}
+
+  {/* Input section with camera button */}
+  <div className="flex gap-3">
+    <div className="flex-1 relative">
+      <input
+        type="text"
+        value={mealInput}
+        onChange={(event) => setMealInput(event.target.value)}
+        placeholder="Наприклад: омлет із 2 яєць, тост і кава"
+        className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white px-4 pr-12 text-base outline-none ring-[#FF7F50]/20 transition-all duration-300 focus:border-[#FF7F50] focus:ring-4"
+      />
+      {/* Camera button */}
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="absolute right-2 top-1/2 -translate-y-1/2 flex h-8 w-8 items-center justify-center rounded-xl border border-slate-200 bg-white/80 text-slate-600 transition-all duration-300 hover:bg-[#FF7F50] hover:text-white hover:border-[#FF7F50]"
+        aria-label="Upload photo"
+      >
+        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/jpeg,image/jpg,image/png,image/webp"
+        onChange={handleImageSelect}
+        className="hidden"
+      />
+    </div>
+    
+    {/* Analyze buttons */}
+    {selectedImage ? (
+      <button
+        type="button"
+        onClick={handlePhotoAnalysis}
+        disabled={isAnalyzingPhoto || !userName.trim()}
+        className="h-12 rounded-2xl bg-gradient-to-r from-[#FF7F50] to-[#FF6347] px-6 font-semibold text-white shadow-[0_10px_20px_rgba(255,127,80,0.25)] transition-all duration-300 hover:scale-[1.03] hover:from-[#FF8C69] hover:to-[#FF6347] active:scale-[0.99] disabled:cursor-not-allowed disabled:from-[#FFB6C1] disabled:to-[#FFA07A] font-['Geist,sans-serif']"
+      >
+        {isAnalyzingPhoto ? "Analyzing..." : "Analyze Photo"}
+      </button>
+    ) : (
+      <button
+        type="button"
+        onClick={handleAnalyze}
+        disabled={isLoading || !userName.trim()}
+        className="h-12 rounded-2xl bg-gradient-to-r from-[#A7F3D0] to-[#6EE7B7] px-6 font-semibold text-white shadow-[0_10px_20px_rgba(167,243,208,0.25)] transition-all duration-300 hover:scale-[1.03] hover:from-[#86EFAC] hover:to-[#4ADE80] active:scale-[0.99] disabled:cursor-not-allowed disabled:from-[#D1FAE5] disabled:to-[#A7F3D0] font-['Geist,sans-serif']"
+      >
+        {isLoading ? "Аналіз..." : "Аналізувати"}
+      </button>
+    )}
+  </div>
+</div>
 
           {error ? <p className="mt-4 text-sm font-medium text-rose-600">{error}</p> : null}
         </section>
@@ -860,7 +931,12 @@ export default function Home() {
         ) : null}
 
         <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {results.length === 0 ? (
+          {isAnalyzingPhoto && (
+            <div className="col-span-full">
+              <PhotoAnalysisLoader />
+            </div>
+          )}
+          {results.length === 0 && !isAnalyzingPhoto ? (
             <div className="col-span-full rounded-2xl border border-dashed border-slate-300/80 bg-white/80 p-8 text-center text-slate-500">
               Тут з&apos;являться результати аналізу калорій та БЖВ.
             </div>
