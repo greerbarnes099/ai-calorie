@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { computeMacroGoalsFromDailyCalories } from "@/lib/macro-goals";
 import { getKyivDayRangeUtc } from "@/lib/kyiv-time";
 import { supabase } from "@/lib/supabase";
+import AvocadoLogo from "@/components/AvocadoLogo";
 
 type NutritionResult = {
   name: string;
@@ -474,6 +475,9 @@ export default function Home() {
       <main className="min-h-screen bg-[#f8faf8] px-4 py-10 text-slate-900">
         <div className="mx-auto flex min-h-[85vh] w-full max-w-3xl items-center justify-center">
           <section className="w-full rounded-2xl border border-white/80 bg-white/80 p-8 text-center shadow-[8px_8px_24px_rgba(15,23,42,0.06),-8px_-8px_24px_rgba(255,255,255,0.92)] backdrop-blur-xl transition-all duration-500">
+            <div className="mb-6 flex justify-center">
+              <AvocadoLogo size="large" animated={true} />
+            </div>
             <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] text-emerald-600">
               AI Calories
             </p>
@@ -557,7 +561,12 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[#f8faf8] px-4 py-10 text-slate-900">
+    <main className="min-h-screen bg-[#f8faf8] px-4 py-10 text-slate-900 relative">
+      {/* Small animated logo in corner */}
+      <div className="fixed top-6 right-6 z-50">
+        <AvocadoLogo size="small" animated={true} />
+      </div>
+      
       <div className="mx-auto flex w-full max-w-5xl flex-col gap-8">
         <section className="rounded-2xl border border-white/80 bg-white/90 p-6 shadow-[8px_8px_24px_rgba(15,23,42,0.06),-8px_-8px_24px_rgba(255,255,255,0.9)] transition-all duration-300 sm:p-8">
           <div className="mb-6 space-y-2">
@@ -727,9 +736,9 @@ export default function Home() {
                   {dailyCalories} / {dailyCalorieGoal} ккал
                 </span>
               </div>
-              <div className="h-5 w-full overflow-hidden rounded-full bg-emerald-100/70">
+              <div className="h-8 w-full overflow-hidden rounded-full bg-emerald-100/70 shadow-inner">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-200 to-emerald-500 transition-all duration-700"
+                  className="progress-bar-enhanced h-full rounded-full bg-gradient-to-r from-emerald-300 via-emerald-400 to-emerald-500 transition-all duration-700 breathe-on-hover shadow-lg"
                   style={{ width: `${getProgress(dailyCalories, dailyCalorieGoal)}%` }}
                 />
               </div>
@@ -742,9 +751,9 @@ export default function Home() {
                   {dailyProtein} / {dailyProteinGoal} г
                 </span>
               </div>
-              <div className="h-5 w-full overflow-hidden rounded-full bg-emerald-100/70">
+              <div className="h-8 w-full overflow-hidden rounded-full bg-emerald-100/70 shadow-inner">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-emerald-100 to-emerald-400 transition-all duration-700"
+                  className="progress-bar-enhanced h-full rounded-full bg-gradient-to-r from-emerald-200 via-emerald-300 to-emerald-400 transition-all duration-700 breathe-on-hover shadow-lg"
                   style={{ width: `${getProgress(dailyProtein, dailyProteinGoal)}%` }}
                 />
               </div>
@@ -757,9 +766,9 @@ export default function Home() {
                   {dailyFat} / {dailyFatGoal} г
                 </span>
               </div>
-              <div className="h-5 w-full overflow-hidden rounded-full bg-orange-100/70">
+              <div className="h-8 w-full overflow-hidden rounded-full bg-orange-100/70 shadow-inner">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-orange-200 to-orange-400 transition-all duration-700"
+                  className="progress-bar-enhanced h-full rounded-full bg-gradient-to-r from-orange-300 via-orange-400 to-orange-500 transition-all duration-700 breathe-on-hover shadow-lg"
                   style={{ width: `${getProgress(dailyFat, dailyFatGoal)}%` }}
                 />
               </div>
@@ -772,9 +781,9 @@ export default function Home() {
                   {dailyCarbs} / {dailyCarbsGoal} г
                 </span>
               </div>
-              <div className="h-5 w-full overflow-hidden rounded-full bg-yellow-100/80">
+              <div className="h-8 w-full overflow-hidden rounded-full bg-yellow-100/80 shadow-inner">
                 <div
-                  className="h-full rounded-full bg-gradient-to-r from-yellow-100 to-yellow-400 transition-all duration-700"
+                  className="progress-bar-enhanced h-full rounded-full bg-gradient-to-r from-yellow-300 via-yellow-400 to-yellow-500 transition-all duration-700 breathe-on-hover shadow-lg"
                   style={{ width: `${getProgress(dailyCarbs, dailyCarbsGoal)}%` }}
                 />
               </div>
@@ -788,6 +797,36 @@ export default function Home() {
             <p className="text-base font-bold text-slate-700">
               Випито: {(dailyWaterMl / 1000).toFixed(1)} л / {(dailyWaterGoal / 1000).toFixed(1)} л
             </p>
+          </div>
+
+          {/* Water progress with wave effect */}
+          <div className="mb-6 relative h-20 overflow-hidden rounded-2xl border-2 border-sky-200 bg-gradient-to-b from-sky-50 to-sky-100">
+            <div 
+              className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-sky-400 to-sky-300 transition-all duration-700"
+              style={{ height: `${getProgress(dailyWaterMl, dailyWaterGoal)}%` }}
+            >
+              {/* Wave effect */}
+              <div className="absolute inset-0 water-wave">
+                <svg className="absolute bottom-0 w-full h-8" viewBox="0 0 100 20" preserveAspectRatio="none">
+                  <path 
+                    d="M0,10 Q25,5 50,10 T100,10 L100,20 L0,20 Z" 
+                    fill="rgba(255,255,255,0.3)"
+                  />
+                </svg>
+                <svg className="absolute bottom-0 w-full h-8" viewBox="0 0 100 20" preserveAspectRatio="none">
+                  <path 
+                    d="M0,10 Q25,15 50,10 T100,10 L100,20 L0,20 Z" 
+                    fill="rgba(255,255,255,0.2)"
+                  />
+                </svg>
+              </div>
+            </div>
+            {/* Water percentage text */}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-lg font-bold text-slate-700 drop-shadow-lg">
+                {Math.round(getProgress(dailyWaterMl, dailyWaterGoal))}%
+              </span>
+            </div>
           </div>
 
           <p className="mb-5 text-sm text-slate-600">
@@ -805,7 +844,7 @@ export default function Home() {
                   type="button"
                   onClick={handleAddWater}
                   disabled={isAddingWater || dailyStatsLoading || !userName.trim()}
-                  className={`flex h-14 w-12 items-center justify-center rounded-2xl border text-xl shadow-sm transition-all duration-300 hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  className={`flex h-14 w-12 items-center justify-center rounded-2xl border text-xl shadow-sm transition-all duration-300 hover:-translate-y-0.5 breathe-on-hover disabled:cursor-not-allowed disabled:opacity-60 ${
                     isFilled
                       ? "border-sky-300 bg-gradient-to-b from-sky-100 to-sky-300 text-sky-700"
                       : "border-sky-100 bg-sky-50/70 text-sky-400 hover:bg-sky-100"
