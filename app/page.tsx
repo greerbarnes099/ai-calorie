@@ -6,6 +6,7 @@ import { getKyivDayRangeUtc } from "@/lib/kyiv-time";
 import { supabase } from "@/lib/supabase";
 import AvocadoLogo from "@/components/AvocadoLogo";
 import FlowerIcon from "@/components/FlowerIcon";
+import AnimatedCharacters from "@/components/AnimatedCharacters";
 
 type NutritionResult = {
   name: string;
@@ -485,99 +486,134 @@ export default function Home() {
           <FlowerIcon color="blue" size="large" />
         </div>
         
-        <div className="mx-auto flex min-h-[85vh] w-full max-w-3xl items-center justify-center relative z-10">
-          <section className="w-full rounded-2xl border border-white/60 bg-white/70 p-8 text-center shadow-[8px_8px_24px_rgba(255,127,80,0.08),-8px_-8px_24px_rgba(255,255,255,0.95)] backdrop-blur-xl transition-all duration-500 relative">
-            {/* Corner flowers */}
-            <div className="absolute top-2 left-2 opacity-30">
-              <FlowerIcon color="coral" size="small" />
-            </div>
-            <div className="absolute top-2 right-2 opacity-30">
-              <FlowerIcon color="lemon" size="small" />
-            </div>
-            <div className="absolute bottom-2 left-2 opacity-30">
-              <FlowerIcon color="blue" size="small" />
-            </div>
-            
-            <div className="mb-6 flex justify-center">
-              <AvocadoLogo size="large" animated={true} />
-            </div>
-            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.2em] retro-heading text-[#FF7F50]">
-              AI Calories
-            </p>
-            <h1 className="mb-2 text-4xl font-bold retro-heading text-slate-900 sm:text-5xl">Обери профіль</h1>
-            <p className="mb-8 text-slate-600">Оберіть існуючий профіль або створіть новий.</p>
-
-            <div className="mb-6">
-              {!isCreatingProfile ? (
-                <button
-                  type="button"
-                  onClick={() => setIsCreatingProfile(true)}
-                  className="w-full rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-6 py-4 text-lg font-semibold text-white shadow-[0_10px_20px_rgba(16,185,129,0.2)] transition-all duration-300 hover:scale-[1.02]"
-                >
-                  Створити новий профіль
-                </button>
-              ) : (
-                <div className="space-y-3 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-4 text-left">
-                  <input
-                    type="text"
-                    value={profileNameInput}
-                    onChange={(event) => setProfileNameInput(event.target.value)}
-                    placeholder="Введи ім'я (наприклад, Микита)"
-                    className="h-12 w-full rounded-2xl border border-slate-200/80 bg-white px-4 text-base outline-none ring-emerald-100 transition-all duration-300 focus:border-emerald-300 focus:ring-4"
-                  />
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleSaveProfile}
-                      disabled={isSavingProfile}
-                      className="flex-1 rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-4 py-3 font-semibold text-white transition-all duration-300 hover:scale-[1.01] disabled:opacity-60"
-                    >
-                      {isSavingProfile ? "Збереження..." : "Зберегти"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsCreatingProfile(false)}
-                      className="rounded-2xl border border-slate-200 bg-white px-4 py-3 font-semibold text-slate-700 transition-all duration-300 hover:bg-slate-50"
-                    >
-                      Скасувати
-                    </button>
-                  </div>
+        <div className="min-h-screen grid lg:grid-cols-2">
+          {/* Left Side - Animated Characters */}
+          <div className="relative hidden lg:flex flex-col justify-between bg-gradient-to-br from-[#FF7F50]/10 via-[#A7F3D0]/5 to-[#FFF44F]/10 p-12">
+            <div className="relative z-20">
+              <div className="flex items-center gap-2 text-lg font-semibold text-slate-800">
+                <div className="size-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <AvocadoLogo size="small" animated={true} />
                 </div>
-              )}
-            </div>
-
-            <div className="space-y-3">
-              <p className="text-sm font-semibold uppercase tracking-wide text-slate-500">
-                Існуючі профілі
-              </p>
-              {isProfilesLoading ? (
-                <div className="flex items-center justify-center gap-3 py-6 text-slate-600">
-                  <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-500" />
-                  <span className="text-sm font-medium">Завантаження профілів...</span>
-                </div>
-              ) : null}
-              {profilesError ? (
-                <p className="text-sm font-medium text-rose-600">{profilesError}</p>
-              ) : null}
-              {!isProfilesLoading && profiles.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4 text-slate-500">
-                  Профілів поки немає. Створи перший профіль.
-                </p>
-              ) : null}
-              <div className="grid gap-3 sm:grid-cols-2">
-                {profiles.map((profile) => (
-                  <button
-                    key={profile.user_name}
-                    type="button"
-                    onClick={() => handleSelectProfile(profile.user_name)}
-                    className="rounded-2xl border border-white/80 bg-white/90 px-4 py-5 text-lg font-bold text-slate-800 shadow-[6px_6px_18px_rgba(15,23,42,0.05),-6px_-6px_18px_rgba(255,255,255,0.9)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-emerald-50"
-                  >
-                    {profile.user_name}
-                  </button>
-                ))}
+                <span className="font-['Geist,sans-serif']">AI Calories</span>
               </div>
             </div>
-          </section>
+
+            <div className="relative z-20 flex items-center justify-center h-[500px]">
+              <AnimatedCharacters 
+                isCreatingProfile={isCreatingProfile} 
+                profilesCount={profiles.length} 
+              />
+            </div>
+
+            <div className="relative z-20 flex items-center gap-8 text-sm text-slate-600">
+              <a href="#" className="hover:text-slate-800 transition-colors font-['Geist,sans-serif']">
+                Privacy Policy
+              </a>
+              <a href="#" className="hover:text-slate-800 transition-colors font-['Geist,sans-serif']">
+                Terms of Service
+              </a>
+              <a href="#" className="hover:text-slate-800 transition-colors font-['Geist,sans-serif']">
+                Contact
+              </a>
+            </div>
+
+            {/* Decorative elements */}
+            <div className="absolute inset-0 bg-grid-white/[0.05] bg-[size:20px_20px]" />
+            <div className="absolute top-1/4 right-1/4 size-64 bg-[#FF7F50]/10 rounded-full blur-3xl" />
+            <div className="absolute bottom-1/4 left-1/4 size-96 bg-[#A7F3D0]/5 rounded-full blur-3xl" />
+          </div>
+
+          {/* Right Side - Profile Selection */}
+          <div className="flex items-center justify-center p-8">
+            <div className="w-full max-w-[420px]">
+              {/* Mobile Logo */}
+              <div className="lg:hidden flex items-center justify-center gap-2 text-lg font-semibold mb-12">
+                <div className="size-8 rounded-lg bg-white/20 backdrop-blur-sm flex items-center justify-center">
+                  <AvocadoLogo size="small" animated={true} />
+                </div>
+                <span className="font-['Geist,sans-serif']">AI Calories</span>
+              </div>
+
+              {/* Header */}
+              <div className="text-center mb-10">
+                <h1 className="text-3xl font-bold tracking-tight mb-2 font-['Geist,sans-serif'] text-slate-900">Welcome back!</h1>
+                <p className="text-slate-600 font-['Inter,sans-serif']">Choose your profile or create a new one</p>
+              </div>
+
+              {/* Profile List */}
+              <div className="space-y-3 mb-6">
+                <p className="text-sm font-semibold uppercase tracking-wide text-slate-500 font-['Geist,sans-serif']">
+                  Existing Profiles
+                </p>
+                {isProfilesLoading ? (
+                  <div className="flex items-center justify-center gap-3 py-6 text-slate-600">
+                    <span className="h-5 w-5 animate-spin rounded-full border-2 border-slate-300 border-t-[#FF7F50]" />
+                    <span className="text-sm font-medium font-['Inter,sans-serif']">Loading profiles...</span>
+                  </div>
+                ) : null}
+                {profilesError ? (
+                  <p className="text-sm font-medium text-rose-600 font-['Inter,sans-serif']">{profilesError}</p>
+                ) : null}
+                {!isProfilesLoading && profiles.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4 text-slate-500 font-['Inter,sans-serif']">
+                    No profiles yet. Create your first profile.
+                  </p>
+                ) : null}
+                <div className="grid gap-3 sm:grid-cols-1">
+                  {profiles.map((profile) => (
+                    <button
+                      key={profile.user_name}
+                      type="button"
+                      onClick={() => handleSelectProfile(profile.user_name)}
+                      className="rounded-2xl border border-white/80 bg-white/90 px-4 py-5 text-lg font-bold text-slate-800 shadow-[6px_6px_18px_rgba(255,127,80,0.08),-6px_-6px_18px_rgba(255,255,255,0.95)] transition-all duration-300 hover:-translate-y-0.5 hover:bg-[#FFF5F5] font-['Geist,sans-serif']"
+                    >
+                      {profile.user_name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Create New Profile */}
+              <div className="mb-6">
+                {!isCreatingProfile ? (
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingProfile(true)}
+                    className="w-full rounded-2xl bg-gradient-to-r from-[#FF7F50] to-[#FF6347] px-6 py-4 text-lg font-semibold text-white shadow-[0_10px_20px_rgba(255,127,80,0.25)] transition-all duration-300 hover:scale-[1.02] font-['Geist,sans-serif']"
+                  >
+                    Create New Profile
+                  </button>
+                ) : (
+                  <div className="space-y-3 rounded-2xl border border-[#FF7F50]/20 bg-[#FF7F50]/5 p-4 text-left">
+                    <input
+                      type="text"
+                      value={profileNameInput}
+                      onChange={(event) => setProfileNameInput(event.target.value)}
+                      placeholder="Enter your name (e.g., Erik)"
+                      className="h-12 w-full rounded-2xl border border-white/60 bg-white px-4 text-base outline-none ring-[#FF7F50]/20 transition-all duration-300 focus:border-[#FF7F50] focus:ring-4 font-['Inter,sans-serif']"
+                    />
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleSaveProfile}
+                        disabled={isSavingProfile}
+                        className="flex-1 rounded-2xl bg-gradient-to-r from-[#FF7F50] to-[#FF6347] px-4 py-3 font-semibold text-white transition-all duration-300 hover:scale-[1.01] disabled:opacity-60 font-['Geist,sans-serif']"
+                      >
+                        {isSavingProfile ? "Saving..." : "Save"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsCreatingProfile(false)}
+                        className="rounded-2xl border border-white/60 bg-white px-4 py-3 font-semibold text-slate-700 transition-all duration-300 hover:bg-slate-50 font-['Geist,sans-serif']"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </main>
     );
