@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
+  --background: #FFF5F5;
   --foreground: #171717;
+  --coral: #FF7F50;
+  --lemon: #FFF44F;
+  --pastel-blue: #A7F3D0;
+  --mint-green: #86efac;
 }
 
 @theme inline {
@@ -22,7 +26,15 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Retro fonts */
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Inter:wght@400;500;600;700&display=swap');
+
+.retro-heading {
+  font-family: 'Playfair Display', Georgia, serif;
+  font-weight: 700;
 }
 
 /* Custom animations */
@@ -50,21 +62,41 @@ body {
   filter: brightness(1.05);
 }
 
-/* Water wave animation */
-@keyframes wave {
+/* Retro wave animation */
+@keyframes retro-wave {
   0% {
-    transform: translateX(0) translateY(0);
+    transform: translateX(0) translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateX(-10%) translateY(-3px) rotate(1deg);
   }
   50% {
-    transform: translateX(-25%) translateY(-5px);
+    transform: translateX(-20%) translateY(-5px) rotate(0deg);
+  }
+  75% {
+    transform: translateX(-30%) translateY(-3px) rotate(-1deg);
   }
   100% {
-    transform: translateX(-50%) translateY(0);
+    transform: translateX(-40%) translateY(0) rotate(0deg);
   }
 }
 
 .water-wave {
-  animation: wave 3s ease-in-out infinite;
+  animation: retro-wave 4s ease-in-out infinite;
+}
+
+/* Flower float animation */
+@keyframes float-flower {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(5deg);
+  }
+}
+
+.float-flower {
+  animation: float-flower 6s ease-in-out infinite;
 }
 
 /* Breathing animation for hover effects */

@@ -26,107 +26,77 @@ export default function AvocadoLogo({
         {/* Avocado outer shape */}
         <defs>
           <linearGradient id="avocadoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#7dd87d" />
-            <stop offset="30%" stopColor="#5cb85c" />
-            <stop offset="60%" stopColor="#4a9d4a" />
-            <stop offset="100%" stopColor="#3d8b3d" />
+            <stop offset="0%" stopColor="#a7f3d0" />
+            <stop offset="50%" stopColor="#86efac" />
+            <stop offset="100%" stopColor="#6ee7b7" />
           </linearGradient>
           <linearGradient id="avocadoInnerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#e8f5e8" />
-            <stop offset="40%" stopColor="#c8e6c9" />
-            <stop offset="100%" stopColor="#a5d6a7" />
+            <stop offset="0%" stopColor="#f0fdf4" />
+            <stop offset="50%" stopColor="#dcfce7" />
+            <stop offset="100%" stopColor="#bbf7d0" />
           </linearGradient>
-          <filter id="grayscale">
-            <feColorMatrix type="matrix" values="0.3 0.3 0.3 0 0 0.3 0.3 0.3 0 0 0.3 0.3 0.3 0 0 0 0 0 1 0"/>
-          </filter>
-          <clipPath id="pitClip">
-            <ellipse cx="100" cy="100" rx="32" ry="38" />
-          </clipPath>
+          <linearGradient id="bloomingSeedGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stopColor="#FF7F50" />
+            <stop offset="50%" stopColor="#FFF44F" />
+            <stop offset="100%" stopColor="#FFB347" />
+          </linearGradient>
         </defs>
 
-        {/* More realistic avocado outer shape - elongated */}
-        <path
-          d="M100 25 Q140 35 150 75 Q155 100 150 125 Q140 165 100 175 Q60 165 50 125 Q45 100 50 75 Q60 35 100 25 Z"
-          fill="url(#avocadoGradient)"
-          stroke="#2e7d32"
-          strokeWidth="2"
-        />
-
-        {/* Avocado inner flesh - more realistic shape */}
-        <path
-          d="M100 35 Q130 42 138 75 Q142 100 138 125 Q130 158 100 165 Q70 158 62 125 Q58 100 62 75 Q70 42 100 35 Z"
-          fill="url(#avocadoInnerGradient)"
-        />
-
-        {/* Face as the pit - elliptical and more prominent */}
-        <g clipPath="url(#pitClip)">
-          <image
-            href="/dlyalogo.jpg"
-            x="68"
-            y="62"
-            width="64"
-            height="76"
-            preserveAspectRatio="xMidYMid slice"
-            filter="url(#grayscale)"
-            className="object-cover"
-          />
-          {/* Enhanced pit overlay for realistic look */}
-          <ellipse
-            cx="100"
-            cy="100"
-            rx="32"
-            ry="38"
-            fill="rgba(101, 67, 33, 0.25)"
-          />
-          {/* Inner pit highlight */}
-          <ellipse
-            cx="95"
-            cy="95"
-            rx="20"
-            ry="24"
-            fill="rgba(139, 90, 43, 0.15)"
-          />
-        </g>
-
-        {/* More realistic pit outline */}
+        {/* Mint green avocado outer shape */}
         <ellipse
           cx="100"
           cy="100"
-          rx="32"
-          ry="38"
-          fill="none"
-          stroke="#654321"
+          rx="85"
+          ry="95"
+          fill="url(#avocadoGradient)"
+          stroke="#86efac"
           strokeWidth="2"
-          opacity="0.4"
         />
 
-        {/* Realistic avocado skin texture */}
-        <path
-          d="M70 60 Q75 55 80 58 M85 50 Q90 48 95 52 M120 55 Q125 52 130 56 M135 65 Q140 63 145 67"
-          stroke="#2e7d32"
-          strokeWidth="1"
-          opacity="0.3"
-          fill="none"
-        />
-
-        {/* Enhanced 3D highlight for avocado */}
+        {/* Avocado inner flesh */}
         <ellipse
-          cx="75"
-          cy="65"
-          rx="18"
-          ry="25"
-          fill="rgba(255, 255, 255, 0.25)"
-          transform="rotate(-25 75 65)"
+          cx="100"
+          cy="100"
+          rx="75"
+          ry="85"
+          fill="url(#avocadoInnerGradient)"
         />
 
-        {/* Pit highlight for depth */}
+        {/* Blooming seed heart - AI symbol */}
+        <g className={animated ? "animate-pulse-slow" : ""}>
+          {/* Main heart shape */}
+          <path
+            d="M100 85 C100 75, 85 65, 75 65 C65 65, 55 75, 55 85 C55 95, 100 135, 100 135 C100 135, 145 95, 145 85 C145 75, 135 65, 125 65 C115 65, 100 75, 100 85 Z"
+            fill="url(#bloomingSeedGradient)"
+            stroke="#FF7F50"
+            strokeWidth="2"
+            opacity="0.9"
+          />
+          
+          {/* Inner petals - blooming effect */}
+          <ellipse cx="85" cy="75" rx="8" ry="12" fill="#FFF44F" opacity="0.7" transform="rotate(-30 85 75)" />
+          <ellipse cx="115" cy="75" rx="8" ry="12" fill="#FFF44F" opacity="0.7" transform="rotate(30 115 75)" />
+          <ellipse cx="100" cy="90" rx="6" ry="10" fill="#FFB347" opacity="0.6" />
+          
+          {/* Center glow */}
+          <circle cx="100" cy="85" r="8" fill="#FF7F50" opacity="0.8" />
+          <circle cx="100" cy="85" r="4" fill="#FFF44F" />
+          
+          {/* Sparkles around the heart */}
+          <circle cx="70" cy="70" r="2" fill="#FFF44F" opacity="0.8" />
+          <circle cx="130" cy="70" r="2" fill="#FFF44F" opacity="0.8" />
+          <circle cx="80" cy="110" r="1.5" fill="#FF7F50" opacity="0.7" />
+          <circle cx="120" cy="110" r="1.5" fill="#FF7F50" opacity="0.7" />
+        </g>
+
+        {/* Highlight for 3D effect */}
         <ellipse
-          cx="90"
-          cy="85"
-          rx="12"
-          ry="15"
-          fill="rgba(255, 255, 255, 0.15)"
-          transform="rotate(-15 90 85)"
+          cx="80"
+          cy="70"
+          rx="15"
+          ry="20"
+          fill="rgba(255, 255, 255, 0.3)"
+          transform="rotate(-20 80 70)"
         />
       </svg>
 
@@ -140,8 +110,22 @@ export default function AvocadoLogo({
               transform: rotate(360deg);
             }
           }
+          @keyframes pulse-slow {
+            0%, 100% {
+              transform: scale(1);
+              opacity: 0.9;
+            }
+            50% {
+              transform: scale(1.05);
+              opacity: 1;
+            }
+          }
           .animate-spin-slow {
             animation: spin-slow 8s linear infinite;
+          }
+          .animate-pulse-slow {
+            animation: pulse-slow 3s ease-in-out infinite;
+            transform-origin: center;
           }
         `}</style>
       )}
