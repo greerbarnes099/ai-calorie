@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { computeMacroGoalsFromDailyCalories } from "@/lib/macro-goals";
 import { getKyivDayRangeUtc } from "@/lib/kyiv-time";
 import { supabase } from "@/lib/supabase";
 
@@ -27,18 +28,19 @@ type UserProfile = {
   user_name: string;
   daily_calories: number;
   daily_water: number;
+  daily_protein: number | null;
+  daily_fat: number | null;
+  daily_carbs: number | null;
 };
 
-const DAILY_GOALS = {
-  calories: 2000,
-  protein: 120,
-  fat: 70,
-  carbs: 250,
-};
+const DEFAULT_DAILY_CALORIES = 2000;
 const DEFAULT_DAILY_WATER_GOAL = 2000;
 const WATER_GLASS_ML = 250;
 
-const getProgress = (value: number, goal: number) => Math.min((value / goal) * 100, 100);
+const getProgress = (value: number, goal: number) => {
+  if (!goal || goal <= 0) return 0;
+  return Math.min((value / goal) * 100, 100);
+};
 const USER_NAME_STORAGE_KEY = "ai-calories-user-name";
 
 export default function Home() {
@@ -53,8 +55,17 @@ export default function Home() {
   const [dailyProtein, setDailyProtein] = useState(0);
   const [dailyFat, setDailyFat] = useState(0);
   const [dailyCarbs, setDailyCarbs] = useState(0);
-  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(DAILY_GOALS.calories);
+  const [dailyCalorieGoal, setDailyCalorieGoal] = useState(DEFAULT_DAILY_CALORIES);
   const [dailyWaterGoal, setDailyWaterGoal] = useState(DEFAULT_DAILY_WATER_GOAL);
+  const [dailyProteinGoal, setDailyProteinGoal] = useState(
+    computeMacroGoalsFromDailyCalories(DEFAULT_DAILY_CALORIES).protein,
+  );
+  const [dailyFatGoal, setDailyFatGoal] = useState(
+    computeMacroGoalsFromDailyCalories(DEFAULT_DAILY_CALORIES).fat,
+  );
+  const [dailyCarbsGoal, setDailyCarbsGoal] = useState(
+    computeMacroGoalsFromDailyCalories(DEFAULT_DAILY_CALORIES).carbs,
+  );
   const [userName, setUserName] = useState("");
   const [profileNameInput, setProfileNameInput] = useState("");
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
@@ -63,7 +74,7 @@ export default function Home() {
   const [isCreatingProfile, setIsCreatingProfile] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsCaloriesInput, setSettingsCaloriesInput] = useState(String(DAILY_GOALS.calories));
+  const [settingsCaloriesInput, setSettingsCaloriesInput] = useState(String(DEFAULT_DAILY_CALORIES));
   const [settingsWaterInput, setSettingsWaterInput] = useState(String(DEFAULT_DAILY_WATER_GOAL));
   const [isUpdatingProfileSettings, setIsUpdatingProfileSettings] = useState(false);
   const [dailyWaterMl, setDailyWaterMl] = useState(0);
@@ -146,7 +157,7 @@ export default function Home() {
       setProfilesError("");
       const { data, error } = await supabase
         .from("user_profiles")
-        .select("user_name, daily_calories, daily_water")
+        .select("user_name, daily_calories, daily_water, daily_protein, daily_fat, daily_carbs")
         .order("user_name", { ascending: true });
 
       if (error) {
@@ -168,10 +179,19 @@ export default function Home() {
       const activeProfileName = activeUserName ?? userName;
       const activeProfile = loadedProfiles.find((profile) => profile.user_name === activeProfileName);
       if (activeProfile) {
-        const nextCalories = Number(activeProfile.daily_calories || DAILY_GOALS.calories);
+        const nextCalories = Number(activeProfile.daily_calories || DEFAULT_DAILY_CALORIES);
         const nextWater = Number(activeProfile.daily_water || DEFAULT_DAILY_WATER_GOAL);
+        const computed = computeMacroGoalsFromDailyCalories(nextCalories);
+        const nextProtein =
+          activeProfile.daily_protein != null ? Number(activeProfile.daily_protein) : computed.protein;
+        const nextFat = activeProfile.daily_fat != null ? Number(activeProfile.daily_fat) : computed.fat;
+        const nextCarbs =
+          activeProfile.daily_carbs != null ? Number(activeProfile.daily_carbs) : computed.carbs;
         setDailyCalorieGoal(nextCalories);
         setDailyWaterGoal(nextWater);
+        setDailyProteinGoal(nextProtein);
+        setDailyFatGoal(nextFat);
+        setDailyCarbsGoal(nextCarbs);
         setSettingsCaloriesInput(String(nextCalories));
         setSettingsWaterInput(String(nextWater));
       }
@@ -249,10 +269,14 @@ export default function Home() {
     try {
       setIsSavingProfile(true);
       setProfilesError("");
+      const macros = computeMacroGoalsFromDailyCalories(DEFAULT_DAILY_CALORIES);
       const { error: insertError } = await supabase.from("user_profiles").insert({
         user_name: trimmedName,
-        daily_calories: 2000,
+        daily_calories: DEFAULT_DAILY_CALORIES,
         daily_water: 2000,
+        daily_protein: macros.protein,
+        daily_fat: macros.fat,
+        daily_carbs: macros.carbs,
       });
 
       if (insertError) {
@@ -285,9 +309,18 @@ export default function Home() {
   const handleSelectProfile = async (selectedName: string) => {
     const selectedProfile = profiles.find((profile) => profile.user_name === selectedName);
     if (selectedProfile) {
-      setDailyCalorieGoal(Number(selectedProfile.daily_calories || DAILY_GOALS.calories));
+      const nextCalories = Number(selectedProfile.daily_calories || DEFAULT_DAILY_CALORIES);
+      const computed = computeMacroGoalsFromDailyCalories(nextCalories);
+      setDailyCalorieGoal(nextCalories);
       setDailyWaterGoal(Number(selectedProfile.daily_water || DEFAULT_DAILY_WATER_GOAL));
-      setSettingsCaloriesInput(String(selectedProfile.daily_calories || DAILY_GOALS.calories));
+      setDailyProteinGoal(
+        selectedProfile.daily_protein != null ? Number(selectedProfile.daily_protein) : computed.protein,
+      );
+      setDailyFatGoal(selectedProfile.daily_fat != null ? Number(selectedProfile.daily_fat) : computed.fat);
+      setDailyCarbsGoal(
+        selectedProfile.daily_carbs != null ? Number(selectedProfile.daily_carbs) : computed.carbs,
+      );
+      setSettingsCaloriesInput(String(selectedProfile.daily_calories || DEFAULT_DAILY_CALORIES));
       setSettingsWaterInput(String(selectedProfile.daily_water || DEFAULT_DAILY_WATER_GOAL));
     }
 
@@ -305,16 +338,20 @@ export default function Home() {
     setMealInput("");
     setResults([]);
     resetDailyStats();
-    setDailyCalorieGoal(DAILY_GOALS.calories);
+    setDailyCalorieGoal(DEFAULT_DAILY_CALORIES);
     setDailyWaterGoal(DEFAULT_DAILY_WATER_GOAL);
-    setSettingsCaloriesInput(String(DAILY_GOALS.calories));
+    const resetMacros = computeMacroGoalsFromDailyCalories(DEFAULT_DAILY_CALORIES);
+    setDailyProteinGoal(resetMacros.protein);
+    setDailyFatGoal(resetMacros.fat);
+    setDailyCarbsGoal(resetMacros.carbs);
+    setSettingsCaloriesInput(String(DEFAULT_DAILY_CALORIES));
     setSettingsWaterInput(String(DEFAULT_DAILY_WATER_GOAL));
     setIsSettingsOpen(false);
     setIsCreatingProfile(false);
     await fetchProfiles();
   };
 
-  const handleSaveProfileSettings = async () => {
+  const handleSaveSettings = async () => {
     if (!userName.trim()) return;
 
     const parsedCalories = Number(settingsCaloriesInput);
@@ -330,6 +367,8 @@ export default function Home() {
       return;
     }
 
+    const macroGoals = computeMacroGoalsFromDailyCalories(parsedCalories);
+
     try {
       setIsUpdatingProfileSettings(true);
       setError("");
@@ -338,6 +377,9 @@ export default function Home() {
         .update({
           daily_calories: parsedCalories,
           daily_water: parsedWater,
+          daily_protein: macroGoals.protein,
+          daily_fat: macroGoals.fat,
+          daily_carbs: macroGoals.carbs,
         })
         .eq("user_name", userName);
 
@@ -355,6 +397,9 @@ export default function Home() {
 
       setDailyCalorieGoal(parsedCalories);
       setDailyWaterGoal(parsedWater);
+      setDailyProteinGoal(macroGoals.protein);
+      setDailyFatGoal(macroGoals.fat);
+      setDailyCarbsGoal(macroGoals.carbs);
       setProfiles((prevProfiles) =>
         prevProfiles.map((profile) =>
           profile.user_name === userName
@@ -362,6 +407,9 @@ export default function Home() {
                 ...profile,
                 daily_calories: parsedCalories,
                 daily_water: parsedWater,
+                daily_protein: macroGoals.protein,
+                daily_fat: macroGoals.fat,
+                daily_carbs: macroGoals.carbs,
               }
             : profile,
         ),
@@ -376,6 +424,12 @@ export default function Home() {
   };
 
   const waterGlassesGoal = Math.max(8, Math.min(10, Math.ceil(dailyWaterGoal / WATER_GLASS_ML)));
+
+  const settingsMacroPreview = useMemo(() => {
+    const c = Number(settingsCaloriesInput);
+    if (!Number.isFinite(c) || c <= 0) return null;
+    return computeMacroGoalsFromDailyCalories(c);
+  }, [settingsCaloriesInput]);
 
   const handleAddWater = async () => {
     if (!userName.trim()) {
@@ -585,10 +639,18 @@ export default function Home() {
                 />
               </label>
             </div>
+            {settingsMacroPreview ? (
+              <p className="mt-4 text-sm text-slate-600">
+                Розраховано БЖВ (25% / 30% / 45%): білки{" "}
+                <span className="font-semibold text-slate-800">{settingsMacroPreview.protein} г</span>, жири{" "}
+                <span className="font-semibold text-slate-800">{settingsMacroPreview.fat} г</span>, вуглеводи{" "}
+                <span className="font-semibold text-slate-800">{settingsMacroPreview.carbs} г</span>
+              </p>
+            ) : null}
             <div className="mt-5 flex gap-2">
               <button
                 type="button"
-                onClick={handleSaveProfileSettings}
+                onClick={handleSaveSettings}
                 disabled={isUpdatingProfileSettings}
                 className="rounded-2xl bg-gradient-to-r from-emerald-400 to-emerald-600 px-5 py-2.5 font-semibold text-white transition-all duration-300 hover:scale-[1.02] disabled:opacity-60"
               >
@@ -677,13 +739,13 @@ export default function Home() {
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-700">Білки</span>
                 <span className="text-base font-bold text-slate-800">
-                  {dailyProtein} / {DAILY_GOALS.protein} г
+                  {dailyProtein} / {dailyProteinGoal} г
                 </span>
               </div>
               <div className="h-5 w-full overflow-hidden rounded-full bg-emerald-100/70">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-emerald-100 to-emerald-400 transition-all duration-700"
-                  style={{ width: `${getProgress(dailyProtein, DAILY_GOALS.protein)}%` }}
+                  style={{ width: `${getProgress(dailyProtein, dailyProteinGoal)}%` }}
                 />
               </div>
             </div>
@@ -692,13 +754,13 @@ export default function Home() {
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-700">Жири</span>
                 <span className="text-base font-bold text-slate-800">
-                  {dailyFat} / {DAILY_GOALS.fat} г
+                  {dailyFat} / {dailyFatGoal} г
                 </span>
               </div>
               <div className="h-5 w-full overflow-hidden rounded-full bg-orange-100/70">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-orange-200 to-orange-400 transition-all duration-700"
-                  style={{ width: `${getProgress(dailyFat, DAILY_GOALS.fat)}%` }}
+                  style={{ width: `${getProgress(dailyFat, dailyFatGoal)}%` }}
                 />
               </div>
             </div>
@@ -707,13 +769,13 @@ export default function Home() {
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="font-semibold text-slate-700">Вуглеводи</span>
                 <span className="text-base font-bold text-slate-800">
-                  {dailyCarbs} / {DAILY_GOALS.carbs} г
+                  {dailyCarbs} / {dailyCarbsGoal} г
                 </span>
               </div>
               <div className="h-5 w-full overflow-hidden rounded-full bg-yellow-100/80">
                 <div
                   className="h-full rounded-full bg-gradient-to-r from-yellow-100 to-yellow-400 transition-all duration-700"
-                  style={{ width: `${getProgress(dailyCarbs, DAILY_GOALS.carbs)}%` }}
+                  style={{ width: `${getProgress(dailyCarbs, dailyCarbsGoal)}%` }}
                 />
               </div>
             </div>
